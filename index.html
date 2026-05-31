@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Corsair Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  /* ─── DESIGN TOKENS ─────────────────────────────────────────────── */
+  :root {
+    --void:        #04050a;
+    --deep:        #080c18;
+    --panel:       rgba(8,14,32,0.72);
+    --glass:       rgba(255,255,255,0.04);
+    --glass-hi:    rgba(255,255,255,0.09);
+    --border:      rgba(99,140,255,0.18);
+    --border-hi:   rgba(99,140,255,0.38);
+    --amber:       #ffb84d;
+    --amber-glow:  rgba(255,184,77,0.25);
+    --amber-dim:   rgba(255,184,77,0.08);
+    --cyan:        #4df7ff;
+    --cyan-glow:   rgba(77,247,255,0.20);
+    --cyan-dim:    rgba(77,247,255,0.07);
+    --blue:        #638cff;
+    --blue-glow:   rgba(99,140,255,0.22);
+    --red:         #ff5f6d;
+    --red-glow:    rgba(255,95,109,0.22);
+    --green:       #3dffa0;
+    --green-dim:   rgba(61,255,160,0.10);
+    --purple:      #b56aff;
+    --text-pri:    #e8eeff;
+    --text-sec:    #8a9ac4;
+    --text-dim:    #4a5578;
+    --font-display: 'Orbitron', monospace;
+    --font-mono:   'Space Mono', monospace;
+    --font-body:   'Inter', sans-serif;
+    --r-sm: 6px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 24px;
+    --transition: all 0.28s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ─── RESET & BASE ──────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--void);
+    color: var(--text-pri);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ─── STAR FIELD CANVAS ─────────────────────────────────────────── */
+  #starfield {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ─── GRID OVERLAY ──────────────────────────────────────────────── */
+  .grid-overlay {
+    position: fixed; inset: 0; z-index: 1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(99,140,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,140,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* ─── SCAN-LINE ─────────────────────────────────────────────────── */
+  .scanline {
+    position: fixed; inset: 0; z-index: 2;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+  }
+
+  /* ─── APP SHELL ─────────────────────────────────────────────────── */
+  #app {
+    position: relative; z-index: 10;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 0 24px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ─── TOP BAR ───────────────────────────────────────────────────── */
+  #topbar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 18px 0 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(4,5,10,0.88);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    margin: 0 -24px;
+    padding-left: 24px; padding-right: 24px;
+  }
+
+  .logo-mark {
+    width: 42px; height: 42px;
+    border: 1.5px solid var(--blue);
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    box-shadow: 0 0 12px var(--blue-glow), inset 0 0 8px rgba(99,140,255,0.08);
+  }
+  .logo-mark svg { width: 22px; height: 22px; }
+  .logo-mark::after {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: var(--r-sm);
+    background: linear-gradient(135deg, rgba(99,140,255,0.3), transparent 60%);
+    pointer-events: none;
+  }
+
+  .logo-text {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .logo-title {
+    font-family: var(--font-display);
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--text-pri);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(99,140,255,0.5);
+  }
+  .logo-sub {
+    font-family: var(--font-mono);
+    font-size: 9px; color: var(--text-dim);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+  }
+
+  .topbar-spacer { flex: 1; }
+
+  .student-pill {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 14px 6px 8px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .student-pill:hover { border-color: var(--border-hi); background: var(--glass-hi); }
+  .avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    color: #fff;
+    font-family: var(--font-display);
+  }
+  .student-name { font-size: 12px; font-weight: 500; color: var(--text-sec); letter-spacing: 0.05em; }
+
+  /* ─── HACKATHON TOGGLE ──────────────────────────────────────────── */
+  .hack-toggle-wrap {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 16px 8px 14px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+  .hack-toggle-wrap::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, var(--amber-dim), transparent);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  body.hackathon .hack-toggle-wrap {
+    border-color: rgba(255,184,77,0.5);
+    box-shadow: 0 0 20px var(--amber-glow), inset 0 0 12px rgba(255,184,77,0.05);
+  }
+  body.hackathon .hack-toggle-wrap::before { opacity: 1; }
+
+  .hack-label {
+    font-family: var(--font-display);
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    transition: color 0.3s ease;
+  }
+  body.hackathon .hack-label { color: var(--amber); text-shadow: 0 0 10px var(--amber-glow); }
+
+  .toggle-switch {
+    width: 38px; height: 20px;
+    background: rgba(99,140,255,0.15);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    position: relative;
+    transition: var(--transition);
+  }
+  body.hackathon .toggle-switch {
+    background: rgba(255,184,77,0.25);
+    border-color: rgba(255,184,77,0.6);
+  }
+  .toggle-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    position: absolute; top: 2px; left: 2px;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.3s;
+  }
+  body.hackathon .toggle-thumb {
+    background: var(--amber);
+    transform: translateX(18px);
+    box-shadow: 0 0 8px var(--amber);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ─── SPRINT ACTIVE BANNER ──────────────────────────────────────── */
+  #sprint-banner {
+    display: none;
+    align-items: center; justify-content: center; gap: 12px;
+    padding: 10px 24px;
+    background: linear-gradient(90deg, rgba(255,184,77,0.12), rgba(255,95,109,0.10));
+    border-bottom: 1px solid rgba(255,184,77,0.3);
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--amber);
+    position: sticky; top: 79px; z-index: 99;
+    margin: 0 -24px;
+    animation: banner-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes banner-pulse {
+    0%,100% { box-shadow: 0 2px 20px rgba(255,184,77,0.15); }
+    50%      { box-shadow: 0 2px 40px rgba(255,184,77,0.35); }
+  }
+  body.hackathon #sprint-banner { display: flex; }
+  .banner-icon { width: 18px; height: 18px; animation: spin-slow 4s linear infinite; }
+  @keyframes spin-slow { to { transform: rotate(360deg); } }
+
+  /* ─── MAIN GRID ─────────────────────────────────────────────────── */
+  #main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 20px;
+    margin-top: 24px;
+    flex: 1;
+  }
+  @media(max-width: 900px) {
+    #main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ─── GLASS PANEL ───────────────────────────────────────────────── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    pointer-events: none;
+  }
+  .panel:hover {
+    border-color: var(--border-hi);
+    box-shadow: 0 8px 40px rgba(99,140,255,0.08);
+  }
+
+  /* ─── PANEL HEADER ──────────────────────────────────────────────── */
+  .panel-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .panel-icon {
+    width: 32px; height: 32px;
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--text-sec);
+    text-transform: uppercase;
+  }
+  .panel-badge {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 100px;
+    border: 1px solid;
+  }
+  .panel-actions {
+    display: flex; gap: 8px; margin-left: auto;
+  }
+  .btn-icon {
+    width: 28px; height: 28px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--glass);
+    color: var(--text-dim);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: var(--transition);
+  }
+  .btn-icon:hover { border-color: var(--border-hi); color: var(--text-pri); background: var(--glass-hi); }
+
+  /* ─── TASK PANEL ────────────────────────────────────────────────── */
+  #panel-tasks { grid-column: 1; }
+  .task-icon { background: var(--blue-glow); }
+
+  .task-list { padding: 14px 22px 20px; display: flex; flex-direction: column; gap: 8px; }
+
+  .task-card {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 14px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+  .task-card::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    transition: background 0.3s;
+  }
+  .task-card.priority-high::before  { background: var(--red); box-shadow: 1px 0 6px var(--red-glow); }
+  .task-card.priority-med::before   { background: var(--amber); box-shadow: 1px 0 6px var(--amber-glow); }
+  .task-card.priority-low::before   { background: var(--cyan); box-shadow: 1px 0 6px var(--cyan-glow); }
+
+  .task-card:hover {
+    border-color: var(--border-hi);
+    background: var(--glass-hi);
+    transform: translateX(2px);
+  }
+
+  /* Hackathon: dim non-sprint tasks */
+  body.hackathon .task-card:not(.sprint) {
+    opacity: 0.28;
+    filter: grayscale(0.6);
+    transform: scale(0.98);
+  }
+  body.hackathon .task-card.sprint {
+    border-color: rgba(255,184,77,0.4);
+    box-shadow: 0 0 16px rgba(255,184,77,0.10);
+  }
+  body.hackathon .task-card.sprint::before { background: var(--amber); }
+
+  .task-check {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0; margin-top: 2px;
+    transition: var(--transition);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .task-card.done .task-check {
+    background: var(--green-dim);
+    border-color: var(--green);
+  }
+  .task-check-inner {
+    width: 8px; height: 8px; border-radius: 2px;
+    background: var(--green);
+    opacity: 0;
+    transition: opacity 0.2s;
+    box-shadow: 0 0 6px var(--green);
+  }
+  .task-card.done .task-check-inner { opacity: 1; }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-name {
+    font-size: 13px; font-weight: 500; color: var(--text-pri);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.4;
+    transition: color 0.3s;
+  }
+  .task-card.done .task-name { color: var(--text-dim); text-decoration: line-through; }
+  .task-meta { display: flex; gap: 8px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
+  .task-tag {
+    font-family: var(--font-mono);
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    padding: 2px 8px; border-radius: 100px; border: 1px solid;
+  }
+  .tag-notion { color: var(--blue); border-color: rgba(99,140,255,0.3); background: rgba(99,140,255,0.08); }
+  .tag-github { color: var(--purple); border-color: rgba(181,106,255,0.3); background: rgba(181,106,255,0.08); }
+  .tag-sprint { color: var(--amber); border-color: rgba(255,184,77,0.4); background: rgba(255,184,77,0.10); }
+  .task-due {
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .task-due.overdue { color: var(--red); }
+  .task-due.today   { color: var(--amber); }
+
+  .task-commits {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--green); margin-left: auto;
+    display: flex; align-items: center; gap: 4px;
+    white-space: nowrap;
+  }
+  .commit-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 4px var(--green); }
+
+  /* ─── GITHUB PANEL ──────────────────────────────────────────────── */
+  #panel-github { grid-column: 2; }
+  .github-icon { background: var(--cyan-glow); }
+
+  .commit-list { padding: 14px 22px 20px; display: flex; flex-direction: column; gap: 8px; }
+
+  .commit-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    cursor: pointer; transition: var(--transition);
+  }
+  .commit-row:hover { border-color: var(--border-hi); background: var(--glass-hi); }
+
+  .commit-hash {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--cyan); letter-spacing: 0.05em;
+    background: var(--cyan-dim); padding: 2px 7px;
+    border-radius: 4px; flex-shrink: 0;
+  }
+  .commit-msg { font-size: 12px; color: var(--text-pri); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .commit-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+
+  .pr-list { padding: 0 22px 20px; }
+  .section-label {
+    font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em;
+    color: var(--text-dim); padding: 8px 0 6px;
+    text-transform: uppercase; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+  }
+  .pr-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(99,140,255,0.07);
+    cursor: pointer; transition: color 0.2s;
+  }
+  .pr-item:hover .pr-title { color: var(--cyan); }
+  .pr-num { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+  .pr-title { font-size: 12px; flex: 1; color: var(--text-sec); }
+  .pr-state {
+    font-family: var(--font-mono); font-size: 9px; padding: 2px 7px;
+    border-radius: 100px; border: 1px solid;
+  }
+  .pr-open   { color: var(--green);  border-color: rgba(61,255,160,0.3); background: rgba(61,255,160,0.08); }
+  .pr-review { color: var(--amber);  border-color: rgba(255,184,77,0.3); background: rgba(255,184,77,0.08); }
+  .pr-merged { color: var(--purple); border-color: rgba(181,106,255,0.3); background: rgba(181,106,255,0.08); }
+
+  /* ─── PRIORITY QUEUE ────────────────────────────────────────────── */
+  #panel-priority { grid-column: 1 / -1; }
+  .pq-header-extra { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-left: auto; }
+
+  .pq-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+    padding: 16px 22px 22px;
+  }
+
+  .pq-card {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 14px 16px;
+    cursor: pointer; transition: var(--transition);
+    position: relative; overflow: hidden;
+  }
+  .pq-card:hover { border-color: var(--border-hi); background: var(--glass-hi); transform: translateY(-2px); }
+
+  .pq-rank {
+    position: absolute; top: 12px; right: 14px;
+    font-family: var(--font-display); font-size: 28px; font-weight: 900;
+    line-height: 1; color: rgba(255,255,255,0.04);
+    pointer-events: none;
+  }
+
+  .pq-urgency {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  }
+  .urgency-bar {
+    flex: 1; height: 3px; border-radius: 100px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+  }
+  .urgency-fill { height: 100%; border-radius: 100px; transition: width 0.5s ease; }
+
+  .pq-name { font-size: 13px; font-weight: 600; color: var(--text-pri); line-height: 1.4; margin-bottom: 8px; }
+  .pq-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pq-commits {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--green);
+    background: var(--green-dim); padding: 3px 8px; border-radius: 100px;
+  }
+
+  /* Hackathon: non-sprint items in priority queue collapse */
+  body.hackathon .pq-card:not(.sprint) {
+    max-height: 0; padding: 0; border: none; opacity: 0;
+    overflow: hidden; margin: 0;
+    transition: max-height 0.5s ease, opacity 0.3s ease, padding 0.4s, margin 0.4s;
+  }
+  body.hackathon .pq-card.sprint {
+    border-color: rgba(255,184,77,0.4);
+  }
+  body.hackathon .pq-card.sprint .pq-rank { color: rgba(255,184,77,0.08); }
+
+  /* ─── LOADING OVERLAY ───────────────────────────────────────────── */
+  .loading-overlay {
+    position: absolute; inset: 0;
+    background: rgba(4,5,10,0.7);
+    display: flex; align-items: center; justify-content: center;
+    border-radius: inherit;
+    z-index: 10; opacity: 0;
+    pointer-events: none; transition: opacity 0.2s;
+  }
+  .loading-overlay.active { opacity: 1; pointer-events: all; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── ERROR STATE ───────────────────────────────────────────────── */
+  .error-state {
+    display: none; flex-direction: column; align-items: center;
+    gap: 8px; padding: 32px 22px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--red);
+    text-align: center;
+  }
+  .error-state.visible { display: flex; }
+  .error-icon { font-size: 24px; }
+
+  /* ─── EMPTY STATE ───────────────────────────────────────────────── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; padding: 28px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* ─── BOTTOM STATUS BAR ─────────────────────────────────────────── */
+  #statusbar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 10px 0 0;
+    border-top: 1px solid var(--border);
+    margin-top: 20px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.08em;
+  }
+  .status-item { display: flex; align-items: center; gap: 5px; }
+  .status-led  { width: 5px; height: 5px; border-radius: 50%; }
+  .led-green  { background: var(--green); box-shadow: 0 0 4px var(--green); }
+  .led-amber  { background: var(--amber); box-shadow: 0 0 4px var(--amber); animation: pulse-dot 1.5s ease-in-out infinite; }
+  .led-dim    { background: var(--text-dim); }
+  #last-refresh { margin-left: auto; }
+
+  .refresh-btn {
+    padding: 4px 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text-sec); font-family: var(--font-mono); font-size: 10px;
+    cursor: pointer; transition: var(--transition); letter-spacing: 0.08em;
+  }
+  .refresh-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px var(--cyan-glow); }
+  .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+
+  /* ─── GLOWING CORNER ACCENTS ────────────────────────────────────── */
+  .corner-tl, .corner-br {
+    position: absolute; width: 40px; height: 40px;
+    pointer-events: none;
+  }
+  .corner-tl { top: 0; left: 0; border-top: 1px solid var(--cyan); border-left: 1px solid var(--cyan); border-radius: var(--r-xl) 0 0 0; opacity: 0.5; }
+  .corner-br { bottom: 0; right: 0; border-bottom: 1px solid var(--cyan); border-right: 1px solid var(--cyan); border-radius: 0 0 var(--r-xl) 0; opacity: 0.5; }
+
+  /* ─── REPO TILES ────────────────────────────────────────────────── */
+  .repo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 22px 16px; }
+  .repo-tile {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md); padding: 10px 12px;
+    cursor: pointer; transition: var(--transition);
+  }
+  .repo-tile:hover { border-color: var(--border-hi); background: var(--glass-hi); }
+  .repo-name { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .repo-meta { display: flex; gap: 10px; margin-top: 6px; }
+  .repo-stat { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 3px; }
+  .lang-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ─── HACKATHON TRANSITION ──────────────────────────────────────── */
+  body.hackathon { background: #030408; }
+  body.hackathon .panel { border-color: rgba(255,184,77,0.12); }
+  body.hackathon #main-grid > .panel:first-child { border-color: rgba(255,184,77,0.22); }
+
+  /* ─── GLOW ANIMATIONS ───────────────────────────────────────────── */
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .task-card, .commit-row, .pq-card {
+    animation: card-in 0.3s ease both;
+  }
+  .task-card:nth-child(2) { animation-delay: 0.04s; }
+  .task-card:nth-child(3) { animation-delay: 0.08s; }
+  .task-card:nth-child(4) { animation-delay: 0.12s; }
+  .task-card:nth-child(5) { animation-delay: 0.16s; }
+  .commit-row:nth-child(2) { animation-delay: 0.04s; }
+  .commit-row:nth-child(3) { animation-delay: 0.08s; }
+  .pq-card:nth-child(2) { animation-delay: 0.05s; }
+  .pq-card:nth-child(3) { animation-delay: 0.10s; }
+  .pq-card:nth-child(4) { animation-delay: 0.15s; }
+  .pq-card:nth-child(5) { animation-delay: 0.20s; }
+
+  /* ─── NOTIFICATION TOAST ────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    backdrop-filter: blur(24px);
+    padding: 12px 18px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-sec);
+    max-width: 280px;
+    transform: translateY(80px); opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast-title { font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
+
+  /* ─── CORP SCROLLBAR ────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+</style>
+</head>
+<body>
+
+<!-- Atmosphere layers -->
+<canvas id="starfield"></canvas>
+<div class="grid-overlay"></div>
+<div class="scanline"></div>
+
+<!-- Sprint Active Banner -->
+<div id="sprint-banner">
+  <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+  SPRINT ACTIVE — FOCUS MODE ENGAGED
+  <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+</div>
+
+<div id="app">
+
+  <!-- ── TOP BAR ─────────────────────────────────────────────────── -->
+  <header id="topbar">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <div class="logo-title">CORSAIR</div>
+      <div class="logo-sub">Student Command Center</div>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <!-- Hackathon Toggle -->
+    <div class="hack-toggle-wrap" id="hack-toggle-btn" role="button" aria-pressed="false" tabindex="0" title="Toggle Hackathon Mode">
+      <div class="status-dot"></div>
+      <span class="hack-label">HACKATHON MODE</span>
+      <div class="toggle-switch">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+
+    <!-- Student Pill -->
+    <div class="student-pill">
+      <div class="avatar" id="avatar-initials">BT</div>
+      <span class="student-name" id="student-name-label">B.Tech Student</span>
+    </div>
+  </header>
+
+  <!-- ── MAIN GRID ───────────────────────────────────────────────── -->
+  <div id="main-grid">
+
+    <!-- ── TASK INTELLIGENCE PANEL ──────────────────────────────── -->
+    <div class="panel" id="panel-tasks">
+      <div class="corner-tl"></div>
+      <div class="panel-header">
+        <div class="panel-icon task-icon">📋</div>
+        <span class="panel-title">Task Intelligence</span>
+        <div class="panel-badge" id="task-badge" style="color:var(--blue);border-color:rgba(99,140,255,0.3);background:rgba(99,140,255,0.08);">
+          <span id="task-count">—</span> tasks
+        </div>
+        <div class="panel-actions">
+          <button class="btn-icon" title="Open Notion" onclick="openNotion()">🔗</button>
+          <button class="btn-icon" title="Refresh tasks" onclick="loadTasks(true)">↻</button>
+        </div>
+      </div>
+      <div id="task-list" class="task-list"></div>
+      <div id="task-loading" class="loading-overlay"><div class="spinner"></div></div>
+      <div id="task-error" class="error-state"><span class="error-icon">⚠</span><span>Failed to reach /tasks<br>Check your FastAPI server</span></div>
+    </div>
+
+    <!-- ── CODE ACTIVITY PANEL ──────────────────────────────────── -->
+    <div class="panel" id="panel-github">
+      <div class="corner-br"></div>
+      <div class="panel-header">
+        <div class="panel-icon github-icon">⚡</div>
+        <span class="panel-title">Code Activity</span>
+        <div class="panel-badge" id="commit-badge" style="color:var(--cyan);border-color:rgba(77,247,255,0.3);background:rgba(77,247,255,0.07);">
+          <span id="commit-count">—</span> commits
+        </div>
+        <div class="panel-actions">
+          <button class="btn-icon" title="Open GitHub" onclick="openGitHub()">🐙</button>
+          <button class="btn-icon" title="Refresh commits" onclick="loadCommits(true)">↻</button>
+        </div>
+      </div>
+
+      <div id="repo-grid" class="repo-grid"></div>
+
+      <div class="pr-list">
+        <div class="section-label">Open Pull Requests</div>
+        <div id="pr-list-inner"></div>
+      </div>
+
+      <div class="section-label" style="margin:0 22px 6px;">Recent Commits</div>
+      <div id="commit-list" class="commit-list"></div>
+      <div id="commit-loading" class="loading-overlay"><div class="spinner"></div></div>
+      <div id="commit-error" class="error-state"><span class="error-icon">⚠</span><span>Failed to reach /commits<br>Check your FastAPI server</span></div>
+    </div>
+
+    <!-- ── PRIORITY QUEUE PANEL ──────────────────────────────────── -->
+    <div class="panel" id="panel-priority" style="grid-column:1/-1;">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:rgba(255,95,109,0.15);">🎯</div>
+        <span class="panel-title">Priority Queue</span>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-left:8px;">/ Coral JOIN result</span>
+        <div class="panel-badge" id="pq-badge" style="color:var(--red);border-color:rgba(255,95,109,0.3);background:rgba(255,95,109,0.08);margin-left:auto;">
+          Cross-source JOIN
+        </div>
+      </div>
+      <div id="pq-grid" class="pq-grid"></div>
+      <div id="pq-loading" class="loading-overlay"><div class="spinner"></div></div>
+      <div id="pq-error" class="error-state"><span class="error-icon">⚠</span><span>Failed to reach /priority-queue<br>Check your FastAPI server</span></div>
+    </div>
+
+  </div><!-- /#main-grid -->
+
+  <!-- ── STATUS BAR ──────────────────────────────────────────────── -->
+  <footer id="statusbar">
+    <div class="status-item">
+      <div class="status-led led-green" id="led-notion"></div>
+      <span>Notion</span>
+    </div>
+    <div class="status-item">
+      <div class="status-led led-green" id="led-github"></div>
+      <span>GitHub</span>
+    </div>
+    <div class="status-item">
+      <div class="status-led led-amber" id="led-coral"></div>
+      <span>Coral Query</span>
+    </div>
+    <div class="status-item">
+      <div class="status-led led-dim" id="led-backend"></div>
+      <span>Backend</span>
+    </div>
+    <span id="last-refresh">Never refreshed</span>
+    <button class="refresh-btn" id="refresh-all-btn" onclick="refreshAll()">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:4px"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+      REFRESH ALL
+    </button>
+  </footer>
+
+</div><!-- /#app -->
+
+<!-- Toast notification -->
+<div id="toast"><div id="toast-title"></div><div id="toast-body"></div></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CORSAIR COMMAND CENTER — Frontend Logic
+   Routes consumed from app.py:
+     GET /tasks           → Notion task data
+     GET /commits         → GitHub commit + repo data
+     GET /priority-queue  → Coral SQL JOIN result
+═══════════════════════════════════════════════════════════════════ */
+
+const BASE_URL = 'http://localhost:8000'; // FastAPI base — matches app.py
+
+/* ── Route constants (mirrors app.py) ─────────────────────────── */
+const ROUTES = {
+  tasks:    `${BASE_URL}/tasks`,
+  commits:  `${BASE_URL}/commits`,
+  pq:       `${BASE_URL}/priority-queue`,
+};
+
+/* ── State ─────────────────────────────────────────────────────── */
+const state = {
+  hackathon: false,
+  tasks:     [],
+  commits:   [],
+  repos:     [],
+  prs:       [],
+  pq:        [],
+  lastRefresh: null,
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   STAR FIELD CANVAS
+═══════════════════════════════════════════════════════════════ */
+(function initStars() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    stars = Array.from({length: 140}, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.2,
+      a: Math.random(),
+      speed: Math.random() * 0.3 + 0.05,
+      drift: (Math.random() - 0.5) * 0.1,
+    }));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    stars.forEach(s => {
+      s.a += s.speed * 0.01;
+      s.x += s.drift;
+      if (s.x > canvas.width) s.x = 0;
+      if (s.x < 0) s.x = canvas.width;
+      const opacity = 0.3 + 0.5 * Math.abs(Math.sin(s.a));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180,200,255,${opacity})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
+  draw();
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   HACKATHON MODE TOGGLE
+═══════════════════════════════════════════════════════════════ */
+const hackBtn = document.getElementById('hack-toggle-btn');
+hackBtn.addEventListener('click', toggleHackathon);
+hackBtn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHackathon(); } });
+
+function toggleHackathon() {
+  state.hackathon = !state.hackathon;
+  document.body.classList.toggle('hackathon', state.hackathon);
+  hackBtn.setAttribute('aria-pressed', state.hackathon);
+  showToast(
+    state.hackathon ? '⚡ SPRINT ACTIVE' : '📚 Normal Mode',
+    state.hackathon ? 'Hackathon focus mode engaged. Non-sprint items hidden.' : 'All tasks restored. Hackathon mode off.'
+  );
+  updateLEDs();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FETCH UTILITIES
+═══════════════════════════════════════════════════════════════ */
+async function apiFetch(url, timeout = 6000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+function showLoading(id) { document.getElementById(id).classList.add('active'); }
+function hideLoading(id) { document.getElementById(id).classList.remove('active'); }
+function showError(id)   { document.getElementById(id).classList.add('visible'); }
+function hideError(id)   { document.getElementById(id).classList.remove('visible'); }
+
+/* ═══════════════════════════════════════════════════════════════
+   LOAD TASKS  →  GET /tasks
+═══════════════════════════════════════════════════════════════ */
+async function loadTasks(forceRefresh = false) {
+  showLoading('task-loading');
+  hideError('task-error');
+  try {
+    const data = await apiFetch(ROUTES.tasks);
+    state.tasks = Array.isArray(data) ? data : (data.tasks || []);
+    renderTasks();
+    document.getElementById('task-count').textContent = state.tasks.length;
+    setLED('led-notion', 'green');
+  } catch(e) {
+    showError('task-error');
+    setLED('led-notion', 'red');
+    if (state.tasks.length === 0) injectMockTasks();
+  } finally {
+    hideLoading('task-loading');
+  }
+}
+
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  if (!state.tasks.length) {
+    el.innerHTML = '<div class="empty-state">No tasks found.<br>Check Notion connection.</div>';
+    return;
+  }
+  el.innerHTML = state.tasks.map((t, i) => {
+    const priorityClass = t.priority === 'high' ? 'priority-high' : t.priority === 'medium' ? 'priority-med' : 'priority-low';
+    const sprintClass   = t.sprint ? 'sprint' : '';
+    const doneClass     = t.status === 'Done' ? 'done' : '';
+    const dueClass      = t.overdue ? 'overdue' : t.due_today ? 'today' : '';
+    const dueIcon       = t.overdue ? '🔴' : t.due_today ? '🟡' : '📅';
+    return `
+    <div class="task-card ${priorityClass} ${sprintClass} ${doneClass}" onclick="taskClicked(${i})" tabindex="0">
+      <div class="task-check" onclick="toggleTask(event,${i})">
+        <div class="task-check-inner"></div>
+      </div>
+      <div class="task-body">
+        <div class="task-name">${esc(t.name || t.title || 'Untitled')}</div>
+        <div class="task-meta">
+          <span class="task-tag tag-notion">NOTION</span>
+          ${t.sprint ? '<span class="task-tag tag-sprint">SPRINT</span>' : ''}
+          ${t.github_linked ? '<span class="task-tag tag-github">GITHUB</span>' : ''}
+          <span class="task-due ${dueClass}">${dueIcon} ${esc(t.due_date || t.deadline || '—')}</span>
+          ${t.status ? `<span class="task-tag" style="color:var(--text-dim);border-color:rgba(100,100,120,0.25);background:rgba(100,100,120,0.08);">${esc(t.status)}</span>` : ''}
+        </div>
+      </div>
+      ${t.commit_count ? `<div class="task-commits"><div class="commit-dot"></div>${t.commit_count} commits</div>` : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('task-count').textContent = state.tasks.length;
+}
+
+function toggleTask(e, i) {
+  e.stopPropagation();
+  const task = state.tasks[i];
+  task.status = task.status === 'Done' ? 'In Progress' : 'Done';
+  renderTasks();
+}
+function taskClicked(i) {
+  const t = state.tasks[i];
+  showToast('📋 ' + esc(t.name || 'Task'), t.notion_url ? 'Opening in Notion…' : `Status: ${t.status || '—'}`);
+  if (t.notion_url) setTimeout(() => window.open(t.notion_url, '_blank'), 600);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOAD COMMITS  →  GET /commits
+═══════════════════════════════════════════════════════════════ */
+async function loadCommits(forceRefresh = false) {
+  showLoading('commit-loading');
+  hideError('commit-error');
+  try {
+    const data = await apiFetch(ROUTES.commits);
+    state.commits = Array.isArray(data) ? data : (data.commits || []);
+    state.repos   = data.repos || [];
+    state.prs     = data.pull_requests || data.prs || [];
+    renderCommits();
+    renderRepos();
+    renderPRs();
+    document.getElementById('commit-count').textContent = state.commits.length;
+    setLED('led-github', 'green');
+  } catch(e) {
+    showError('commit-error');
+    setLED('led-github', 'red');
+    if (state.commits.length === 0) injectMockCommits();
+  } finally {
+    hideLoading('commit-loading');
+  }
+}
+
+function renderCommits() {
+  const el = document.getElementById('commit-list');
+  if (!state.commits.length) { el.innerHTML = '<div class="empty-state">No commits found.</div>'; return; }
+  el.innerHTML = state.commits.slice(0, 6).map(c => `
+    <div class="commit-row" onclick="commitClicked('${esc(c.url || '#')}')">
+      <span class="commit-hash">${esc((c.sha || c.hash || 'abc1234').slice(0,7))}</span>
+      <span class="commit-msg">${esc(c.message || c.msg || 'No message')}</span>
+      <span class="commit-time">${esc(c.time_ago || c.timestamp || '—')}</span>
+    </div>`).join('');
+  document.getElementById('commit-count').textContent = state.commits.length;
+}
+
+function renderRepos() {
+  const el = document.getElementById('repo-grid');
+  if (!state.repos.length) { el.style.display = 'none'; return; }
+  el.innerHTML = state.repos.slice(0, 4).map(r => `
+    <div class="repo-tile" onclick="window.open('${esc(r.url || '#')}','_blank')">
+      <div class="repo-name">⬡ ${esc(r.name || 'repo')}</div>
+      <div class="repo-meta">
+        <span class="repo-stat"><span class="lang-dot" style="background:${langColor(r.language)};"></span>${esc(r.language || '—')}</span>
+        <span class="repo-stat">★ ${r.stars || 0}</span>
+        <span class="repo-stat">↑ ${r.last_push || '—'}</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderPRs() {
+  const el = document.getElementById('pr-list-inner');
+  if (!state.prs.length) { el.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);padding:6px 0;">No open PRs</div>'; return; }
+  el.innerHTML = state.prs.slice(0, 4).map(pr => {
+    const stateClass = pr.state === 'open' ? 'pr-open' : pr.state === 'merged' ? 'pr-merged' : 'pr-review';
+    return `
+    <div class="pr-item" onclick="window.open('${esc(pr.url || '#')}','_blank')">
+      <span class="pr-num">#${pr.number || '?'}</span>
+      <span class="pr-title">${esc(pr.title || '—')}</span>
+      <span class="pr-state ${stateClass}">${esc(pr.state || 'open')}</span>
+    </div>`;
+  }).join('');
+}
+
+function commitClicked(url) {
+  if (url && url !== '#') window.open(url, '_blank');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOAD PRIORITY QUEUE  →  GET /priority-queue
+═══════════════════════════════════════════════════════════════ */
+async function loadPQ(forceRefresh = false) {
+  showLoading('pq-loading');
+  hideError('pq-error');
+  try {
+    const data = await apiFetch(ROUTES.pq);
+    state.pq = Array.isArray(data) ? data : (data.items || data.queue || []);
+    renderPQ();
+    setLED('led-coral', 'green');
+    setLED('led-backend', 'green');
+  } catch(e) {
+    showError('pq-error');
+    setLED('led-coral', 'red');
+    if (state.pq.length === 0) injectMockPQ();
+  } finally {
+    hideLoading('pq-loading');
+  }
+}
+
+function renderPQ() {
+  const el = document.getElementById('pq-grid');
+  if (!state.pq.length) { el.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">Priority queue empty.<br>Check Coral query endpoint.</div>'; return; }
+  el.innerHTML = state.pq.map((item, i) => {
+    const urgency = item.urgency_score || item.priority_score || (100 - i * 10);
+    const urgencyPct = Math.max(5, Math.min(100, urgency));
+    const color = urgencyPct > 75 ? 'var(--red)' : urgencyPct > 45 ? 'var(--amber)' : 'var(--cyan)';
+    const sprintClass = item.sprint ? 'sprint' : '';
+    return `
+    <div class="pq-card ${sprintClass}" onclick="pqClicked(${i})">
+      <div class="pq-rank">${String(i+1).padStart(2,'0')}</div>
+      <div class="pq-urgency">
+        <span style="font-family:var(--font-mono);font-size:9px;color:${color};min-width:26px;">${Math.round(urgencyPct)}%</span>
+        <div class="urgency-bar">
+          <div class="urgency-fill" style="width:${urgencyPct}%;background:${color};box-shadow:0 0 6px ${color}40;"></div>
+        </div>
+      </div>
+      <div class="pq-name">${esc(item.name || item.title || 'Task')}</div>
+      <div class="pq-meta">
+        ${item.source_notion ? '<span class="task-tag tag-notion">NOTION</span>' : ''}
+        ${item.source_github ? '<span class="task-tag tag-github">GITHUB</span>' : ''}
+        ${item.sprint        ? '<span class="task-tag tag-sprint">SPRINT</span>' : ''}
+        ${item.due_date ? `<span class="task-due" style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">📅 ${esc(item.due_date)}</span>` : ''}
+        ${item.commit_count  ? `<span class="pq-commits"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 4px var(--green);display:inline-block;"></span>${item.commit_count} commits</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function pqClicked(i) {
+  const item = state.pq[i];
+  showToast('🎯 #' + (i+1) + ' Priority', esc(item.name || item.title || 'Task'));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REFRESH ALL
+═══════════════════════════════════════════════════════════════ */
+async function refreshAll() {
+  const btn = document.getElementById('refresh-all-btn');
+  btn.classList.add('spinning');
+  setLED('led-backend', 'amber');
+  await Promise.allSettled([loadTasks(true), loadCommits(true), loadPQ(true)]);
+  state.lastRefresh = new Date();
+  document.getElementById('last-refresh').textContent = 'Last refresh: ' + state.lastRefresh.toLocaleTimeString();
+  btn.classList.remove('spinning');
+  updateLEDs();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LED STATUS
+═══════════════════════════════════════════════════════════════ */
+function setLED(id, color) {
+  const el = document.getElementById(id);
+  el.className = 'status-led led-' + (color === 'green' ? 'green' : color === 'red' ? '' : 'amber');
+  if (color === 'red') { el.style.background = 'var(--red)'; el.style.boxShadow = '0 0 4px var(--red)'; }
+  else el.style.cssText = '';
+}
+function updateLEDs() {
+  if (state.hackathon) setLED('led-coral', 'amber');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════ */
+let toastTimer;
+function showToast(title, body = '') {
+  clearTimeout(toastTimer);
+  document.getElementById('toast-title').textContent = title;
+  document.getElementById('toast-body').textContent  = body;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════ */
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function langColor(lang) {
+  const map = { JavaScript:'#f7df1e', Python:'#3776ab', TypeScript:'#3178c6', Go:'#00add8', Rust:'#dea584', CSS:'#1572b6', HTML:'#e34f26' };
+  return map[lang] || '#638cff';
+}
+
+function openNotion() {
+  showToast('🔗 Notion', 'Opening workspace…');
+  setTimeout(() => window.open('https://notion.so', '_blank'), 400);
+}
+function openGitHub() {
+  showToast('🐙 GitHub', 'Opening profile…');
+  setTimeout(() => window.open('https://github.com', '_blank'), 400);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOCK DATA (used when API is unreachable — for demo / offline)
+═══════════════════════════════════════════════════════════════ */
+function injectMockTasks() {
+  state.tasks = [
+    { name:'Implement Coral SQL JOIN query', status:'In Progress', priority:'high', sprint:true, due_date:'Today', due_today:true, commit_count:3, github_linked:true },
+    { name:'Build Hackathon Mode toggle animation', status:'In Progress', priority:'high', sprint:true, due_date:'Today', due_today:true },
+    { name:'Record 3-min Loom demo video', status:'To Do', priority:'high', sprint:true, due_date:'Tonight' },
+    { name:'Write Discord show-and-tell post', status:'To Do', priority:'med', sprint:true, due_date:'Tonight' },
+    { name:'OS Assignment — Virtual Memory', status:'To Do', priority:'med', sprint:false, due_date:'Jun 04' },
+    { name:'DBMS Lab Report submission', status:'Done', priority:'low', sprint:false, due_date:'May 29' },
+    { name:'DSA practice — Segment Trees', status:'To Do', priority:'low', sprint:false, due_date:'Jun 07' },
+  ];
+  renderTasks();
+  document.getElementById('task-count').textContent = state.tasks.length;
+  showToast('📡 Demo Mode', 'Using mock data — connect FastAPI to see live data');
+}
+
+function injectMockCommits() {
+  state.commits = [
+    { sha:'a4f2c91', message:'feat: Coral JOIN query for Notion × GitHub cross-source', time_ago:'2h ago', url:'#' },
+    { sha:'b7e3d12', message:'fix: hackathon toggle session state persistence', time_ago:'3h ago', url:'#' },
+    { sha:'c9a1f44', message:'chore: FastAPI route scaffolding for /priority-queue', time_ago:'5h ago', url:'#' },
+    { sha:'d2b8e33', message:'feat: dataframe schema for Coral response parsing', time_ago:'7h ago', url:'#' },
+    { sha:'e1c7a22', message:'style: glassmorphism panel CSS overhaul', time_ago:'9h ago', url:'#' },
+  ];
+  state.repos = [
+    { name:'corsair-command-center', language:'Python', stars:0, last_push:'2h ago', url:'#' },
+    { name:'btech-dsa-solutions', language:'Python', stars:4, last_push:'1d ago', url:'#' },
+    { name:'ml-lab-experiments', language:'Python', stars:2, last_push:'3d ago', url:'#' },
+    { name:'web-dev-portfolio', language:'JavaScript', stars:7, last_push:'1w ago', url:'#' },
+  ];
+  state.prs = [
+    { number:12, title:'feat: Hackathon mode priority filtering', state:'open', url:'#' },
+    { number:11, title:'fix: Coral query timeout handling', state:'review', url:'#' },
+    { number:10, title:'chore: env config for local dev', state:'merged', url:'#' },
+  ];
+  renderCommits();
+  renderRepos();
+  renderPRs();
+  document.getElementById('commit-count').textContent = state.commits.length;
+}
+
+function injectMockPQ() {
+  state.pq = [
+    { name:'Implement Coral SQL JOIN query', urgency_score:97, sprint:true, source_notion:true, source_github:true, due_date:'Tonight', commit_count:3 },
+    { name:'Record Loom demo — 3 min max', urgency_score:88, sprint:true, source_notion:true, due_date:'Tonight' },
+    { name:'Hackathon Mode toggle (money shot)', urgency_score:82, sprint:true, source_notion:true, source_github:true, commit_count:1 },
+    { name:'Discord #show-and-tell post', urgency_score:70, sprint:true, source_notion:true, due_date:'Tonight' },
+    { name:'LinkedIn/X post with demo video', urgency_score:60, sprint:true, source_notion:true, due_date:'Tonight' },
+    { name:'OS Assignment — Virtual Memory', urgency_score:38, sprint:false, source_notion:true, due_date:'Jun 04' },
+    { name:'DSA practice — Segment Trees', urgency_score:22, sprint:false, source_notion:true, due_date:'Jun 07' },
+  ];
+  renderPQ();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════ */
+(async function init() {
+  // Try to fetch live data; fall back to mock if unavailable
+  await Promise.allSettled([loadTasks(), loadCommits(), loadPQ()]);
+  state.lastRefresh = new Date();
+  document.getElementById('last-refresh').textContent = 'Last refresh: ' + state.lastRefresh.toLocaleTimeString();
+
+  // Auto-refresh every 60s
+  setInterval(refreshAll, 60_000);
+
+  // Keyboard shortcut: H = toggle hackathon
+  document.addEventListener('keydown', e => {
+    if (e.key === 'h' || e.key === 'H') {
+      if (!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) toggleHackathon();
+    }
+  });
+
+  showToast('🏴‍☠️ Corsair Online', 'Command Center initialized. Press H to toggle Hackathon Mode.');
+})();
+</script>
+</body>
+</html>
